@@ -1,13 +1,3 @@
-#!/usr/bin/env python
-"""
-This simple example is used for the line-by-line tutorial
-that comes with pygame. It is based on a 'popular' web banner.
-Note there are comments here, but for the full explanation,
-follow along in the tutorial.
-"""
-
-
-#Import Modules
 import os, pygame
 from pygame.locals import *
 from pygame.compat import geterror
@@ -17,6 +7,8 @@ if not pygame.mixer: print('Warning, sound disabled')
 
 main_dir = os.path.split(os.path.abspath(__file__))[0]
 data_dir = os.path.join(main_dir, 'data')
+
+from constants import *
 
 #functions to create our resources
 def load_image(name, colorkey=None):
@@ -47,135 +39,128 @@ def load_sound(name):
   return sound
 
 
-#classes for our game objects
-class Fist(pygame.sprite.Sprite):
-  """moves a clenched fist on the screen, following the mouse"""
+class Brick(pygame.sprite.Sprite):
+  """Logic for a brick"""
+  def __init__(self,rect,color):
+    pygame.sprite.Sprite.__init__(self)
+    self.image = pygame.Surface(rect.size)
+    self.image.fill(color)
+    self.rect = self.image.get_rect()
+    self.rect.topleft = rect.topleft
+    self.broken = False
+
+  def destroy(self):
+    self.broken = True
+    self.image.set_alpha(0)
+
+class Wall(pygame.sprite.Sprite):
+  def __init__(self,rect):
+    pygame.sprite.Sprite.__init__(self)
+    self.image = pygame.Surface(rect.size)
+    self.image.fill((255,255,255))
+    self.rect = self.image.get_rect()
+    self.rect.topleft = rect.topleft
+
+  def chgcolorto(self,color):
+    self.image.fill(color)
+
+class Paddle(pygame.sprite.Sprite):
   def __init__(self):
-    pygame.sprite.Sprite.__init__(self) #call Sprite initializer
-    self.image, self.rect = load_image('fist.bmp', -1)
-    self.punching = 0
+    pygame.sprite.Sprite.__init__(self)
+    self.image = pygame.Surface(PADDLE_INIT_RECT.size)
+    self.image.fill((255,255,255))
+    self.rect = self.image.get_rect()
+    self.rect.topleft = PADDLE_INIT_RECT.topleft
+    self.spd = 5
+
+  def move(self, direction=None):
+    if direction=="left":
+      direction = -1
+    elif direction=="right":
+      direction = 1
+    else: assert(0)
+    self.rect.move_ip(direction*self.spd, 0)
+    self.rect = self.rect.clamp(SCREEN_RECT)
+
+class Ball(pygame.sprite.Sprite):
+  def __init__(self):
+    pygame.sprite.Sprite.__init__(self)
+    self.image = pygame.Surface(BALL_INIT_RECT.size)
+    self.image.fill((255,255,255))
+    self.rect = self.image.get_rect()
+    self.rect.topleft = BALL_INIT_RECT.topleft
+
+    self.spd = 4 #pixels per frame
+    self.dir = (1,1) #+x and +y
+
+  def _nextpos(self):
+    return (self.spd*self.dir[0], self.spd*self.dir[1])
+
+  def bounce(self,nextdir=None):
+    if nextdir=="up":
+      self.dir=(self.dir[0],-1)
+    elif nextdir=="down":
+      self.dir=(self.dir[0],1)
+    elif nextdir=="left":
+      self.dir=(-1,self.dir[0])
+    elif nextdir=="right":
+      self.dir=(1,self.dir[0])
+    else: assert(False)
+    
+  def update(self):
+    newpos = self.rect.move(self._nextpos())
+
+class Score(pygame.sprite.Sprite):
+  def __init__(self):
+    pygame.sprite.Sprite.__init__(self)
+    self.font = pygame.font.Font(None, 20)
+    self.font.set_italic(1)
+    self.color = Color('white')
+    self.lastscore = -1
+    self.update()
+    self.rect = self.image.get_rect().move(10, 450)
 
   def update(self):
-    # move the fist based on the mouse position
-    pos = pygame.mouse.get_pos()
-    self.rect.midtop = pos
-    if self.punching:
-      self.rect.move_ip(5, 10)
-
-  def punch(self, target):
-    # returns true if the fist collides with the target
-    if not self.punching:
-      self.punching = 1
-      hitbox = self.rect.inflate(-5, -5)
-      return hitbox.colliderect(target.rect)
-
-  def unpunch(self):
-    # called to pull the fist back
-    self.punching = 0
-
-
-class Chimp(pygame.sprite.Sprite):
-  """moves a monkey critter across the screen. it can spin the
-     monkey when it is punched."""
-  def __init__(self):
-    pygame.sprite.Sprite.__init__(self) #call Sprite intializer
-    self.image, self.rect = load_image('chimp.bmp', -1)
-    screen = pygame.display.get_surface()
-    self.area = screen.get_rect()
-    self.rect.topleft = 10, 10
-    self.move = 9
-    self.dizzy = 0
-
-  def update(self):
-    # walk or spin, depending on the monkeys state
-    if self.dizzy:
-      self._spin()
-    else:
-      self._walk()
-
-  def _walk(self):
-    # move the monkey across the screen, and turn at the ends
-    newpos = self.rect.move((self.move, 0))
-    if self.rect.left < self.area.left or \
-      self.rect.right > self.area.right:
-      self.move = -self.move
-      newpos = self.rect.move((self.move, 0))
-      self.image = pygame.transform.flip(self.image, 1, 0)
-    self.rect = newpos
-
-  def _spin(self):
-    # spin the monkey image
-    center = self.rect.center
-    self.dizzy = self.dizzy + 12
-    if self.dizzy >= 360:
-      self.dizzy = 0
-      self.image = self.original
-    else:
-      rotate = pygame.transform.rotate
-      self.image = rotate(self.original, self.dizzy)
-    self.rect = self.image.get_rect(center=center)
-
-  def punched(self):
-    # this will cause the monkey to start spinning
-    if not self.dizzy:
-      self.dizzy = 1
-      self.original = self.image
-
+    if SCORE != self.lastscore:
+      self.lastscore = SCORE
+      msg = "Score: %d" % SCORE
+      self.image = self.font.render(msg, 0, self.color)
 
 def main():
-  """this function is called when the program starts.
-     it initializes everything it needs, then runs in
-     a loop until the function returns."""
-#Initialize Everything
   pygame.init()
-  screen = pygame.display.set_mode((468, 60))
-  pygame.display.set_caption('Monkey Fever')
+  screen = pygame.display.set_mode(SCREEN_RECT.size)
+  pygame.display.set_caption('Breakout')
   pygame.mouse.set_visible(0)
 
-#Create The Backgound
   background = pygame.Surface(screen.get_size())
   background = background.convert()
-  background.fill((250, 250, 250))
+  background.fill((0,0,0))
 
-#Put Text On The Background, Centered
-  if pygame.font:
-    font = pygame.font.Font(None, 36)
-    text = font.render("Pummel The Chimp, And Win $$$", 1, (10, 10, 10))
-    textpos = text.get_rect(centerx=background.get_width()/2)
-    background.blit(text, textpos)
-
-#Display The Background
   screen.blit(background, (0, 0))
   pygame.display.flip()
 
-#Prepare Game Objects
   clock = pygame.time.Clock()
-  whiff_sound = load_sound('whiff.wav')
-  punch_sound = load_sound('punch.wav')
-  chimp = Chimp()
-  fist = Fist()
-  allsprites = pygame.sprite.Group((fist, chimp))
+  topwall = Wall(TOPWALL_RECT)
+  leftwall = Wall(LEFTWALL_RECT)
+  rightwall = Wall(RIGHTWALL_RECT)
+  ball = Ball()
+  paddle = Paddle()
+  bricks = [Brick(brect,(255,0,255)) for brect in BRICKS_RECTS]
+  allsprites = bricks
+  allsprites.extend([topwall,leftwall,rightwall,ball,paddle])
+  allsprites = pygame.sprite.Group(allsprites)
 
-
-#Main Loop
-  going = True
-  while going:
+  while True:
     clock.tick(60)
 
-    #Handle Input Events
-    for event in pygame.event.get():
-      if event.type == QUIT:
-        going = False
-      elif event.type == KEYDOWN and event.key == K_ESCAPE:
-        going = False
-      elif event.type == MOUSEBUTTONDOWN:
-        if fist.punch(chimp):
-          punch_sound.play() #punch
-          chimp.punched()
-        else:
-          whiff_sound.play() #miss
-      elif event.type == MOUSEBUTTONUP:
-        fist.unpunch()
+    currpressed = pygame.key.get_pressed()
+
+    if currpressed[K_ESCAPE]:
+      break
+    elif currpressed[K_LEFT]:
+      paddle.move("left")
+    elif currpressed[K_RIGHT]:
+      paddle.move("right")
 
     allsprites.update()
 
@@ -184,11 +169,9 @@ def main():
     allsprites.draw(screen)
     pygame.display.flip()
 
+    pygame.event.pump()
+
   pygame.quit()
 
-#Game Over
-
-
-#this calls the 'main' function when this script is executed
 if __name__ == '__main__':
   main()
