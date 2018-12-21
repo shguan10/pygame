@@ -40,7 +40,6 @@ def load_sound(name):
 
 
 class Brick(pygame.sprite.Sprite):
-  """Logic for a brick"""
   def __init__(self,rect,color):
     pygame.sprite.Sprite.__init__(self)
     self.image = pygame.Surface(rect.size)
@@ -50,8 +49,7 @@ class Brick(pygame.sprite.Sprite):
     self.broken = False
 
   def destroy(self):
-    self.broken = True
-    self.image.set_alpha(0)
+    self.kill()
 
 class Wall(pygame.sprite.Sprite):
   def __init__(self,rect):
@@ -109,6 +107,7 @@ class Ball(pygame.sprite.Sprite):
     
   def update(self):
     newpos = self.rect.move(self._nextpos())
+    print("here")
 
 class Score(pygame.sprite.Sprite):
   def __init__(self):
