@@ -39,36 +39,60 @@ def load_sound(name):
   return sound
 
 
-class Brick(pygame.sprite.Sprite):
+class Obstacle(pygame.sprite.Sprite):
   def __init__(self,rect,color):
     pygame.sprite.Sprite.__init__(self)
     self.image = pygame.Surface(rect.size)
     self.image.fill(color)
     self.rect = self.image.get_rect()
     self.rect.topleft = rect.topleft
-    self.broken = False
 
-  def destroy(self):
+  def collided(self):
+    pass
+
+  def update(self,ball):
+    bnextpos = ball.nextpos()
+    ball_col,ball_row = bnextpos.topleft
+    bw,bh = bnextpos.size
+    lcol, trow = self.rect.topleft
+    w,h = self.rect.size
+    rcol = lcol+w
+    bot_row = trow+h
+    ball_interior_col = lcol<= ball_col <= rcol
+    ball_interior_row = trow<= ball_row <= bot_row
+    if ball_interior_row and (rcol-1<=ball_col <=rcol+1):
+      ball.bounce("right")
+      self.collided()
+    
+    if ball_interior_row and (lcol-1<=ball_col+bw <=lcol+1):
+      ball.bounce("left")
+      self.collided()
+    
+    if ball_interior_col and (trow-2<=ball_row+bh <=trow+2):
+      ball.bounce("up")
+      self.collided()
+    
+    if ball_interior_col and (bot_row-2<=ball_row <=bot_row+2):
+      ball.bounce("down")
+      self.collided()
+
+class Brick(Obstacle):
+  def __init__(self,rect,color):
+    Obstacle.__init__(self,rect,color)
+
+  def collided(self):
     self.kill()
 
-class Wall(pygame.sprite.Sprite):
+class Wall(Obstacle):
   def __init__(self,rect):
-    pygame.sprite.Sprite.__init__(self)
-    self.image = pygame.Surface(rect.size)
-    self.image.fill((255,255,255))
-    self.rect = self.image.get_rect()
-    self.rect.topleft = rect.topleft
+    Obstacle.__init__(self,rect,(255,255,255))
 
   def chgcolorto(self,color):
     self.image.fill(color)
 
-class Paddle(pygame.sprite.Sprite):
+class Paddle(Obstacle):
   def __init__(self):
-    pygame.sprite.Sprite.__init__(self)
-    self.image = pygame.Surface(PADDLE_INIT_RECT.size)
-    self.image.fill((255,255,255))
-    self.rect = self.image.get_rect()
-    self.rect.topleft = PADDLE_INIT_RECT.topleft
+    Obstacle.__init__(self,PADDLE_INIT_RECT,(255,255,255))
     self.spd = 5
 
   def move(self, direction=None):
@@ -88,10 +112,13 @@ class Ball(pygame.sprite.Sprite):
     self.rect = self.image.get_rect()
     self.rect.topleft = BALL_INIT_RECT.topleft
 
-    self.spd = 4 #pixels per frame
+    self.spd = 2 #pixels per frame
     self.dir = (1,1) #+x and +y
 
-  def _nextpos(self):
+  def nextpos(self):
+    return self.rect.move(self._poschg())
+
+  def _poschg(self):
     return (self.spd*self.dir[0], self.spd*self.dir[1])
 
   def bounce(self,nextdir=None):
@@ -100,14 +127,13 @@ class Ball(pygame.sprite.Sprite):
     elif nextdir=="down":
       self.dir=(self.dir[0],1)
     elif nextdir=="left":
-      self.dir=(-1,self.dir[0])
+      self.dir=(-1,self.dir[1])
     elif nextdir=="right":
-      self.dir=(1,self.dir[0])
+      self.dir=(1,self.dir[1])
     else: assert(False)
     
-  def update(self):
-    newpos = self.rect.move(self._nextpos())
-    print("here")
+  def update(self,ball):
+    self.rect.move_ip(self._poschg())
 
 class Score(pygame.sprite.Sprite):
   def __init__(self):
@@ -161,7 +187,7 @@ def main():
     elif currpressed[K_RIGHT]:
       paddle.move("right")
 
-    allsprites.update()
+    allsprites.update(ball)
 
     #Draw Everything
     screen.blit(background, (0, 0))
