@@ -1,7 +1,13 @@
 import os, pygame
 from pygame.locals import *
+from utility import *
 
-SCREEN_RECT = Rect(0, 0, 740, 480)
+collide_sound = load_sound("boop.wav")
+error_sound = load_sound("error.wav")
+sad_sound = load_sound("sad.wav")
+win_sound = load_sound("win.wav")
+
+SCREEN_RECT = Rect(0, 0, 840, 480)
 FIELD_RECT = Rect(0, 0, 640, 480)
 
 LEFTWALL_RECT = Rect(20,10,20,460)
@@ -27,3 +33,12 @@ PADDLE_INIT_RECT = Rect(400,440,64,20)
 PADDLE_AREA_RECT = Rect(40,440,590-20-20,20)
 DEFAULT_INIT_LIVES = 3
 DEFAULT_INIT_BALL_SPD = 5
+
+PADDLE_SPD_UP_COLOR = (0,255,0)
+BALL_SLOW_COLOR = (255,0,255)
+
+POWERUP_LIST_RECT = (640,40)
+POWERUP_DROP_RATE = 1.0
+MAX_ACQ_POWERS = 6
+
+POWERUP_RECT_SIZE = (20,20)

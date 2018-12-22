@@ -6,8 +6,7 @@ from utility import *
 from sprites import *
 
 def main():
-  pygame.mixer.pre_init(44100, -16, 2, 512)
-  pygame.mixer.init()
+
   pygame.init()
 
   screen = pygame.display.set_mode(SCREEN_RECT.size)
@@ -22,12 +21,14 @@ def main():
   pygame.display.flip()
 
   clock = pygame.time.Clock()
-  topwall = Wall(TOPWALL_RECT)
-  leftwall = Wall(LEFTWALL_RECT)
-  rightwall = Wall(RIGHTWALL_RECT)
+  topwall = Wall(TOPWALL_RECT,collide_sound)
+  leftwall = Wall(LEFTWALL_RECT,collide_sound)
+  rightwall = Wall(RIGHTWALL_RECT,collide_sound)
   ball = Ball()
-  paddle = Paddle()
-  bricks = [Brick(brect,(255,0,0) if i%2 else (0,0,255)) for i,brect in enumerate(BRICKS_RECTS)]
+  paddle = Paddle(collide_sound)
+  powerups = []
+  ActivePowerupsGroup = pygame.sprite.Group(powerups)
+  bricks = [Brick(brect,(255,0,0) if i%2 else (0,0,255),collide_sound,ActivePowerupsGroup) for i,brect in enumerate(BRICKS_RECTS)]
   lives = Lives()
   msg = Message()
   BricksGroup = pygame.sprite.Group(bricks)
@@ -35,10 +36,7 @@ def main():
   TextsGroup = pygame.sprite.Group([lives,msg])
   Others = pygame.sprite.Group([topwall,leftwall,rightwall,paddle])
 
-  collide_sound = load_sound("boop.wav")
-  error_sound = load_sound("error.wav")
-  sad_sound = load_sound("sad.wav")
-  win_sound = load_sound("win.wav")
+  gotten_powerups = PowerupList(ball=ball,paddle=paddle)
 
   state="wait"
   inplay=False
@@ -60,8 +58,8 @@ def main():
       inplay=True
       prevserve = False
       state="inplay"
-      for b in BallsGroup: b.resetspd()
       msg.chgmsg("Good luck")
+      for b in BallsGroup: b.resetspd()
     elif state=="inplay" and lives.decreased:
       inplay=False
       error_sound.play()
@@ -88,16 +86,19 @@ def main():
       BricksGroup.add(bricks)
       for s in Others: s.reset()
       for x in TextsGroup: x.reset()
+      gotten_powerups.reset()
 
     prevserve = currpressed[K_SPACE]
 
     updateargs = {"ball":ball,
-                  "collide_sound":collide_sound,
                   "lives":lives,
                   "inplay":inplay,
                   "lost":lost,
-                  "won":won}
+                  "won":won,
+                  "prect":paddle.rect,
+                  "acq_plist":gotten_powerups}
     
+    ActivePowerupsGroup.update(updateargs)    
     BricksGroup.update(updateargs)
     Others.update(updateargs)
     TextsGroup.update()
@@ -105,6 +106,8 @@ def main():
 
     #Draw Everything
     screen.blit(background, (0, 0))
+    gotten_powerups.update()
+    ActivePowerupsGroup.draw(screen)
     BricksGroup.draw(screen)
     BallsGroup.draw(screen)
     TextsGroup.draw(screen)

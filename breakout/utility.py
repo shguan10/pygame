@@ -8,6 +8,9 @@ if not pygame.mixer: print('Warning, sound disabled')
 main_dir = os.path.split(os.path.abspath(__file__))[0]
 data_dir = os.path.join(main_dir, 'data')
 
+pygame.mixer.pre_init(44100, -16, 2, 512)
+pygame.mixer.init()
+
 def load_image(name, colorkey=None):
   fullname = os.path.join(data_dir, name)
   try:
