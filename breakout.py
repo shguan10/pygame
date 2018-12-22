@@ -10,7 +10,6 @@ data_dir = os.path.join(main_dir, 'data')
 
 from constants import *
 
-#functions to create our resources
 def load_image(name, colorkey=None):
   fullname = os.path.join(data_dir, name)
   try:
@@ -38,7 +37,6 @@ def load_sound(name):
     raise SystemExit(str(geterror()))
   return sound
 
-
 class Obstacle(pygame.sprite.Sprite):
   def __init__(self,rect,color):
     pygame.sprite.Sprite.__init__(self)
@@ -46,11 +44,17 @@ class Obstacle(pygame.sprite.Sprite):
     self.image.fill(color)
     self.rect = self.image.get_rect()
     self.rect.topleft = rect.topleft
-
-  def collided(self):
+    self.reset()
+    
+  def reset(self):
     pass
 
-  def update(self,ball):
+  def collided(self,collide_sound):
+    collide_sound.play()
+
+  def update(self,ps):
+    ball = ps["ball"]
+    collide_sound = ps["collide_sound"]
     bnextpos = ball.nextpos()
     ball_col,ball_row = bnextpos.topleft
     bw,bh = bnextpos.size
@@ -60,27 +64,29 @@ class Obstacle(pygame.sprite.Sprite):
     bot_row = trow+h
     ball_interior_col = lcol<= ball_col <= rcol
     ball_interior_row = trow<= ball_row <= bot_row
-    if ball_interior_row and (rcol-1<=ball_col <=rcol+1):
+    if not ps["inplay"]: return
+    if ball_interior_row and (rcol-ball.spd<=ball_col <=rcol+1):
       ball.bounce("right")
-      self.collided()
+      self.collided(collide_sound)
     
-    if ball_interior_row and (lcol-1<=ball_col+bw <=lcol+1):
+    if ball_interior_row and (lcol-1<=ball_col+bw <=lcol+ball.spd):
       ball.bounce("left")
-      self.collided()
+      self.collided(collide_sound)
     
-    if ball_interior_col and (trow-2<=ball_row+bh <=trow+2):
+    if ball_interior_col and (trow-2*ball.spd<=ball_row+bh <=trow+2):
       ball.bounce("up")
-      self.collided()
+      self.collided(collide_sound)
     
-    if ball_interior_col and (bot_row-2<=ball_row <=bot_row+2):
+    if ball_interior_col and (bot_row-2<=ball_row <=bot_row+ball.spd):
       ball.bounce("down")
-      self.collided()
+      self.collided(collide_sound)
 
 class Brick(Obstacle):
   def __init__(self,rect,color):
     Obstacle.__init__(self,rect,color)
 
-  def collided(self):
+  def collided(self,collide_sound):
+    collide_sound.play()
     self.kill()
 
 class Wall(Obstacle):
@@ -93,6 +99,9 @@ class Wall(Obstacle):
 class Paddle(Obstacle):
   def __init__(self):
     Obstacle.__init__(self,PADDLE_INIT_RECT,(255,255,255))
+
+  def reset(self):
+    Obstacle.reset(self)
     self.spd = 5
 
   def move(self, direction=None):
@@ -108,12 +117,16 @@ class Ball(pygame.sprite.Sprite):
   def __init__(self):
     pygame.sprite.Sprite.__init__(self)
     self.image = pygame.Surface(BALL_INIT_RECT.size)
+    self.reset()
+
+  def reset(self):
     self.image.fill((255,255,255))
     self.rect = self.image.get_rect()
-    self.rect.topleft = BALL_INIT_RECT.topleft
+    self.resetspd()
 
-    self.spd = 2 #pixels per frame
-    self.dir = (1,1) #+x and +y
+  def resetspd(self):
+    self.spd = DEFAULT_INIT_BALL_SPD #pixels per frame
+    self.dir = (1,-1) #+x and +y
 
   def nextpos(self):
     return self.rect.move(self._poschg())
@@ -132,27 +145,61 @@ class Ball(pygame.sprite.Sprite):
       self.dir=(1,self.dir[1])
     else: assert(False)
     
-  def update(self,ball):
-    self.rect.move_ip(self._poschg())
+  def update(self,ps):
+    if ps["inplay"]: self.rect.move_ip(self._poschg())
+    else: 
+      self.rect.clamp_ip(ps["prect"])
+      self.rect.move_ip((0,-self.rect.size[1]-1))
+    if not SCREEN_RECT.contains(self.rect):
+      ps["lives"].decrement()
 
-class Score(pygame.sprite.Sprite):
+class Message(pygame.sprite.Sprite):
+  def __init__(self):
+    pygame.sprite.Sprite.__init__(self)
+    self.font = pygame.font.Font(None, 50)
+    self.font.set_italic(1)
+    self.color = Color('white')
+    self.chgmsg("Press Space!")
+
+  def reset(self):
+    self.chgmsg("Press Space!")
+
+  def chgmsg(self,msg):
+    self.image = self.font.render(msg, 0, self.color)
+    self.rect = self.image.get_rect().move((SCREEN_RECT.size[0]/2-200,SCREEN_RECT.size[1]/2))
+
+class Lives(pygame.sprite.Sprite):
   def __init__(self):
     pygame.sprite.Sprite.__init__(self)
     self.font = pygame.font.Font(None, 20)
     self.font.set_italic(1)
     self.color = Color('white')
-    self.lastscore = -1
-    self.update()
-    self.rect = self.image.get_rect().move(10, 450)
+    self.reset()
+
+  def reset(self):
+    self.livesleft = DEFAULT_INIT_LIVES
+    self.decreased = False
+    self.increased = False
+    self.image = self.font.render("Lives: "+str(self.livesleft), 0, self.color)
+    self.rect = self.image.get_rect().move(45, 40)
+
+  def decrement(self):
+    self.livesleft-=1
+    self.decreased = True
+
+  def increment(self):
+    self.livesleft+=1
+    self.increased = True
 
   def update(self):
-    if SCORE != self.lastscore:
-      self.lastscore = SCORE
-      msg = "Score: %d" % SCORE
-      self.image = self.font.render(msg, 0, self.color)
+    self.image = self.font.render("Lives: "+str(self.livesleft), 0, self.color)
+      
 
 def main():
+  pygame.mixer.pre_init(44100, -16, 2, 512)
+  pygame.mixer.init()
   pygame.init()
+
   screen = pygame.display.set_mode(SCREEN_RECT.size)
   pygame.display.set_caption('Breakout')
   pygame.mouse.set_visible(0)
@@ -171,27 +218,87 @@ def main():
   ball = Ball()
   paddle = Paddle()
   bricks = [Brick(brect,(255,0,255)) for brect in BRICKS_RECTS]
-  allsprites = bricks
-  allsprites.extend([topwall,leftwall,rightwall,ball,paddle])
-  allsprites = pygame.sprite.Group(allsprites)
+  lives = Lives()
+  msg = Message()
+  BricksGroup = pygame.sprite.Group(bricks)
+  BallsGroup = pygame.sprite.Group(ball)
+  TextsGroup = pygame.sprite.Group([lives,msg])
+  Others = pygame.sprite.Group([topwall,leftwall,rightwall,paddle])
+
+  collide_sound = load_sound("boop.wav")
+  error_sound = load_sound("error.wav")
+  sad_sound = load_sound("sad.wav")
+  win_sound = load_sound("win.wav")
+
+  state="wait"
+  inplay=False
+  lost = False
+  won = False
+
+  prevserve = False
 
   while True:
     clock.tick(60)
 
     currpressed = pygame.key.get_pressed()
 
-    if currpressed[K_ESCAPE]:
-      break
-    elif currpressed[K_LEFT]:
-      paddle.move("left")
-    elif currpressed[K_RIGHT]:
-      paddle.move("right")
+    if currpressed[K_ESCAPE]: break
+    elif currpressed[K_LEFT]:  paddle.move("left")
+    elif currpressed[K_RIGHT]: paddle.move("right")
 
-    allsprites.update(ball)
+    if state=="wait" and currpressed[K_SPACE] and not prevserve:
+      inplay=True
+      prevserve = False
+      state="inplay"
+      for b in BallsGroup: b.resetspd()
+      msg.chgmsg("Good luck")
+    elif state=="inplay" and lives.decreased:
+      inplay=False
+      error_sound.play()
+      state="wait" if lives.livesleft else "lost"
+      lost = lives.livesleft == 0
+      lives.decreased = False
+      msg.chgmsg(":(")
+    elif state=="inplay" and not BricksGroup:
+      inplay = False
+      state="won"
+      won=True
+    elif state=="lost":
+      sad_sound.play()
+      state="newgame"
+      msg.chgmsg(">:(")
+    elif state=="won":
+      win_sound.play()
+      state="newgame"
+      msg.chgmsg("A Winner is You!")
+    elif state=="newgame"and currpressed[K_SPACE]:
+      inplay=False
+      state="wait"
+      lost,won=False,False
+      BricksGroup.add(bricks)
+      for s in Others: s.reset()
+      for x in TextsGroup: x.reset()
+
+    prevserve = currpressed[K_SPACE]
+
+    updateargs = {"ball":ball,
+                  "collide_sound":collide_sound,
+                  "lives":lives,
+                  "inplay":inplay,
+                  "lost":lost,
+                  "won":won}
+    
+    BricksGroup.update(updateargs)
+    Others.update(updateargs)
+    TextsGroup.update()
+    BallsGroup.update({"inplay":inplay,"lives":lives,"prect":paddle.rect})
 
     #Draw Everything
     screen.blit(background, (0, 0))
-    allsprites.draw(screen)
+    BricksGroup.draw(screen)
+    BallsGroup.draw(screen)
+    TextsGroup.draw(screen)
+    Others.draw(screen)
     pygame.display.flip()
 
     pygame.event.pump()
