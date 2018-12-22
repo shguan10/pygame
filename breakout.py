@@ -102,7 +102,7 @@ class Paddle(Obstacle):
       direction = 1
     else: assert(0)
     self.rect.move_ip(direction*self.spd, 0)
-    self.rect = self.rect.clamp(SCREEN_RECT)
+    self.rect = self.rect.clamp(PADDLE_AREA_RECT)
 
 class Ball(pygame.sprite.Sprite):
   def __init__(self):
