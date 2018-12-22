@@ -105,10 +105,12 @@ class Brick(Obstacle):
     if Obstacle.update(self,ps):
       if len(ps["acq_plist"])<MAX_ACQ_POWERS and random.random() < POWERUP_DROP_RATE:
         prect = Rect((0,0),POWERUP_RECT_SIZE).clamp(self.rect)
-        Brick.active_powerups_group.add(PaddleSpeedUp(prect,
-                                                      ps["acq_plist"],
-                                                      collide_sound,
-                                                      1.5))
+        ch = random.choice(POWERUP_CHOICES)
+        if ch=="paddle_spd":
+          powerup = PaddleSpeed(prect, ps["acq_plist"], collide_sound,1.5)
+        elif ch=="ball_spd":
+          powerup = BallSpeed(prect, ps["acq_plist"], collide_sound,0.8)
+        Brick.active_powerups_group.add(powerup)
 
 class Wall(Obstacle):
   def __init__(self,rect,sound):
@@ -197,8 +199,6 @@ class PowerupList(pygame.sprite.Sprite):
     self.color = Color('white')
     PowerupList.paddle = paddle
     PowerupList.ball = ball
-    self.powerups = []
-    self.desc_list = []
     self.reset()
 
   def __len__(self):
@@ -208,9 +208,10 @@ class PowerupList(pygame.sprite.Sprite):
     return "Powerups:\n"+('\n'.join(self.desc_list))
 
   def reset(self):
-    while self.powerups:
-      self.pop()
+    self.powerups = []
+    self.desc_list = []
     PowerupList.paddle.reset()
+    PowerupList.ball.reset()
     ptext.draw("Power ups:\nNone",POWERUP_LIST_RECT)
 
   def add(self,powerup):
@@ -218,6 +219,8 @@ class PowerupList(pygame.sprite.Sprite):
     d=powerup.get_description()
     if d.startswith("Paddle"):
       PowerupList.paddle.spd *= p.ratio
+    elif d.startswith("Ball Speed"):
+      PowerupList.ball.spd *= p.ratio
     self.powerups.append(p)
     self.desc_list.append(d)
 
@@ -226,6 +229,8 @@ class PowerupList(pygame.sprite.Sprite):
     d=self.desc_list.pop()
     if d.startswith("Paddle"):
       PowerupList.paddle.spd /= p.ratio
+    elif d.startswith("Ball Speed"):
+      PowerupList.ball.spd /= p.ratio
     
   def update(self):
     ptext.draw(self.getstr(),POWERUP_LIST_RECT)
@@ -256,7 +261,7 @@ class Powerup(Obstacle):
     self.rect.move_ip((self.dir[0]*self.spd,self.dir[1]*self.spd))
     return False
 
-class PaddleSpeedUp(Powerup):
+class PaddleSpeed(Powerup):
   def __init__(self,rect,plist,sound,num):
     Powerup.__init__(self,rect,PADDLE_SPD_UP_COLOR,(0,1),5,plist,sound)
     self.ratio = num
@@ -264,7 +269,7 @@ class PaddleSpeedUp(Powerup):
   def get_description(self):
     return "Paddle Speed times "+str(self.ratio)
 
-class BallSlowDown(Powerup):
+class BallSpeed(Powerup):
   def __init__(self,rect,plist,sound,num):
     Powerup.__init__(self,rect,BALL_SLOW_COLOR,(0,1),5,plist,sound)
     self.ratio = num
